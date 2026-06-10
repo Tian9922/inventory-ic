@@ -6,52 +6,23 @@
   <title>Inventory IC - Online</title>
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 
-  <!-- ===== FIREBASE SDK ===== -->
-  <!-- LANGKAH: Ganti 3 nilai di bawah ini dengan config Firebase Anda -->
-  <script type="module">
-    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-    import { getDatabase, ref, set, get, onValue, child }
-      from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
-
-    // =====================================================================
-    // 🔧 GANTI INI DENGAN CONFIG FIREBASE ANDA
-    // (Cara mendapat config: lihat panduan di file PANDUAN_FIREBASE.html)
-    // =====================================================================
-    // Import the functions you need from the SDKs you need
-import { initializeApp } from "firebase/app";
-import { getAnalytics } from "firebase/analytics";
-// TODO: Add SDKs for Firebase products that you want to use
-// https://firebase.google.com/docs/web/setup#available-libraries
-
-// Your web app's Firebase configuration
-// For Firebase JS SDK v7.20.0 and later, measurementId is optional
-const firebaseConfig = {
-  apiKey: "AIzaSyC8l7yQ3yCtqw4Cj3RMMlhb-fWdPaXmRSw",
-  authDomain: "inventory-tian.firebaseapp.com",
-  databaseURL: "https://inventory-tian-default-rtdb.asia-southeast1.firebasedatabase.app",
-  projectId: "inventory-tian",
-  storageBucket: "inventory-tian.firebasestorage.app",
-  messagingSenderId: "705890526810",
-  appId: "1:705890526810:web:d2b9cd65801f32f60f9a63",
-  measurementId: "G-KVJ4F4YB6S"
-};
-
-// Initialize Firebase
-const app = initializeApp(firebaseConfig);
-const analytics = getAnalytics(app);
-    // =====================================================================
-
-    const app = initializeApp(firebaseConfig);
-    const db  = getDatabase(app);
-
-    // Expose ke global scope supaya fungsi non-module bisa akses
-    window._fb = { db, ref, set, get, onValue, child };
-
-    // Tunggu sampai DOM siap lalu init Firebase
-    document.addEventListener("DOMContentLoaded", () => {
-      window._fbReady = true;
-      if(window._fbInitCallback) window._fbInitCallback();
-    });
+  <!-- ===== FIREBASE SDK (Compat - lebih reliable) ===== -->
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-database-compat.js"></script>
+  <script>
+    const firebaseConfig = {
+      apiKey:            "AIzaSyC8l7yQ3yCtqw4Cj3RMMlhb-fWdPaXmRSw",
+      authDomain:        "inventory-tian.firebaseapp.com",
+      databaseURL:       "https://inventory-tian-default-rtdb.asia-southeast1.firebasedatabase.app",
+      projectId:         "inventory-tian",
+      storageBucket:     "inventory-tian.firebasestorage.app",
+      messagingSenderId: "705890526810",
+      appId:             "1:705890526810:web:d2b9cd65801f32f60f9a63"
+    };
+    firebase.initializeApp(firebaseConfig);
+    window._db = firebase.database();
+    window._fbReady = true;
+    console.log("✅ Firebase siap");
   </script>
   <style>
     /* ===== LOGIN ===== */
@@ -1248,9 +1219,8 @@ const FB_KEYS = ["customMasterData","barang","stockInLog","stockOutLog","transfe
 
 // Simpan satu key ke Firebase
 function fbSave(key, data){
-  if(!window._fb) return;
-  const { db, ref, set } = window._fb;
-  set(ref(db, "inventory/"+key), data).catch(e=>console.error("Firebase save error:",e));
+  if(!window._db) return;
+  window._db.ref("inventory/"+key).set(data).catch(e=>console.error("Firebase save error:",e));
 }
 
 // Shortcut — dipanggil menggantikan banyak localStorage.setItem
@@ -1275,8 +1245,8 @@ function hideLoader(){
 
 // Init realtime listeners — dipanggil setelah login berhasil
 function initFirebaseListeners(){
-  if(!window._fb){ console.warn("Firebase belum siap"); return; }
-  const { db, ref, onValue } = window._fb;
+  if(!window._db){ console.warn("Firebase belum siap"); return; }
+  const db = window._db;
   showLoader("Menghubungkan ke database...");
   let loadedCount = 0;
   const total = FB_KEYS.length;
@@ -1292,27 +1262,27 @@ function initFirebaseListeners(){
     }
   }
 
-  onValue(ref(db,"inventory/customMasterData"), snap => {
+  db.ref("inventory/customMasterData").on("value", snap => {
     customMasterData = snap.val() || []; onLoaded();
     markDirty("monitor","in","out","transfer","intransit","ledger","analisis"); renderTab(activeTab);
   });
-  onValue(ref(db,"inventory/barang"), snap => {
+  db.ref("inventory/barang").on("value", snap => {
     daftarBarang = snap.val() || []; onLoaded();
     markDirty("monitor","ledger","analisis"); renderTab(activeTab);
   });
-  onValue(ref(db,"inventory/stockInLog"), snap => {
+  db.ref("inventory/stockInLog").on("value", snap => {
     stockInLog = snap.val() || []; onLoaded();
     markDirty("in","ledger","analisis"); renderTab(activeTab);
   });
-  onValue(ref(db,"inventory/stockOutLog"), snap => {
+  db.ref("inventory/stockOutLog").on("value", snap => {
     stockOutLog = snap.val() || []; onLoaded();
     markDirty("out","ledger","analisis"); renderTab(activeTab);
   });
-  onValue(ref(db,"inventory/transferLog"), snap => {
+  db.ref("inventory/transferLog").on("value", snap => {
     transferLog = snap.val() || []; onLoaded();
     markDirty("transfer","ledger"); renderTab(activeTab);
   });
-  onValue(ref(db,"inventory/intransitLog"), snap => {
+  db.ref("inventory/intransitLog").on("value", snap => {
     intransitLog = snap.val() || []; onLoaded();
     markDirty("intransit","analisis"); renderTab(activeTab);
   });
@@ -1320,7 +1290,6 @@ function initFirebaseListeners(){
 
 // Dipanggil setelah login sukses (dari doLogin)
 window._fbInitCallback = function(){
-  // hanya jika sudah login
   if(currentRole) initFirebaseListeners();
 };
 

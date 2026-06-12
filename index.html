@@ -332,13 +332,11 @@
           <input type="number" id="in-qty" min="1" placeholder="Pcs">
         </div>
         <div class="form-group-full">
-          <label data-i18n="label_ref">No. Referensi:</label>
-          <input type="text" id="in-ref" placeholder="No. PO, surat jalan, dll...">
-        </div>
-        <div class="form-group-full">
           <label>Keterangan:</label>
           <input type="text" id="in-keterangan" placeholder="Keterangan tambahan...">
         </div>
+        <!-- in-ref hidden: kept for JS compatibility -->
+        <input type="hidden" id="in-ref" value="-">
       </div>
       <div style="display:flex;gap:5px">
         <button id="in-tombol-aksi" class="btn btn-green" onclick="simpanStockIn()" data-i18n="btn_save_in">✅ Simpan Stock In</button>
@@ -348,7 +346,7 @@
   </div>
   <div class="right-panel">
     <div class="filter-row">
-      <input type="text" id="in-search" placeholder="🔍 Cari SKU / Nama / No. Ref..." oninput="debounce('in',tampilkanStockIn,250)" style="flex:2">
+      <input type="text" id="in-search" placeholder="🔍 Cari SKU / Nama / Keterangan..." oninput="debounce('in',tampilkanStockIn,250)" style="flex:2">
       <div style="display:flex;flex-direction:column;gap:1px">
         <label style="font-size:10px;color:#718096" data-i18n="dari_tanggal">Dari Tanggal</label>
         <input type="date" id="in-filter-from" onchange="tampilkanStockIn()" style="flex:1">
@@ -367,7 +365,7 @@
     <div class="table-container">
       <table>
         <thead><tr><th>No</th><th data-i18n="th_tanggal">Tanggal</th><th data-i18n="th_sku">SKU</th><th data-i18n="th_nama">Nama Barang</th>
-          <th data-i18n="th_gudang">Gudang</th><th data-i18n="th_qty_masuk">Qty Masuk</th><th data-i18n="th_konversi">Konversi</th><th data-i18n="th_harga">Harga</th><th data-i18n="th_total_nilai">Total Nilai</th><th data-i18n="th_ref">Referensi</th><th data-i18n="th_keterangan">Keterangan</th>
+          <th data-i18n="th_gudang">Gudang</th><th data-i18n="th_qty_masuk">Qty Masuk</th><th data-i18n="th_konversi">Konversi</th><th data-i18n="th_harga">Harga</th><th data-i18n="th_total_nilai">Total Nilai</th><th data-i18n="th_keterangan">Keterangan</th>
           <th style="width:60px;text-align:center" data-i18n="th_aksi">Aksi</th>
         </tr></thead>
         <tbody id="tabelStockIn"></tbody>
@@ -2260,7 +2258,7 @@ function editStockIn(id){
   document.getElementById("in-harga").value=r.harga;
   document.getElementById("in-warehouse").value=r.warehouse;
   document.getElementById("in-qty").value=r.qty;
-  document.getElementById("in-ref").value=r.ref;
+  document.getElementById("in-ref").value=r.ref||"-";
   document.getElementById("in-keterangan").value=r.keterangan||"";
   document.getElementById("in-tombol-aksi").innerText="💾 Simpan Edit";
   document.getElementById("in-tombol-batal").style.display="inline-block";
@@ -2283,13 +2281,13 @@ function tampilkanStockIn(){
   let wh=document.getElementById("in-filter-wh").value;
   tbody.innerHTML="";
   let hasil=stockInLog.filter(r=>{
-    let matchK=r.sku.toLowerCase().includes(keyword)||r.nama.toLowerCase().includes(keyword)||(r.ref||"").toLowerCase().includes(keyword);
+    let matchK=r.sku.toLowerCase().includes(keyword)||r.nama.toLowerCase().includes(keyword)||(r.keterangan||"").toLowerCase().includes(keyword);
     let matchF=!from||r.tanggal>=from;
     let matchT=!to||r.tanggal<=to;
     let matchW=wh==="All"||(r.warehouse||"Bintaro").toUpperCase()===wh.toUpperCase();
     return matchK&&matchF&&matchT&&matchW;
   }).sort((a,b)=>b.tanggal.localeCompare(a.tanggal));
-  if(hasil.length===0){ tbody.innerHTML="<tr><td colspan='12' class='kosong'>"+t("no_data_in")+"</td></tr>"; return; }
+  if(hasil.length===0){ tbody.innerHTML="<tr><td colspan='11' class='kosong'>"+t("no_data_in")+"</td></tr>"; return; }
   hasil.forEach(function(r,i){
     let uom=hitungUOM(r.qty,r.isiKarton);
     let nilai=r.qty*r.harga;
@@ -2298,7 +2296,6 @@ function tampilkanStockIn(){
       "<td><span class='badge badge-gudang'>"+r.warehouse+"</span></td>"+
       "<td><span class='badge badge-in'>+"+r.qty+" pcs</span></td>"+
       "<td><strong>"+uom+"</strong></td><td>"+rpFormat(r.harga)+"</td><td><strong>"+rpFormat(nilai)+"</strong></td>"+
-      "<td title='"+r.ref+"'>"+r.ref+"</td>"+
       "<td title='"+(r.keterangan||"-")+"'>"+(r.keterangan||"-")+"</td>"+
       "<td style='text-align:center'>"+(isAdmin()?"<button class='btn-action btn-edit' onclick='editStockIn(\""+r.id+"\")'>Edit</button> <button class='btn-action btn-hapus' onclick='hapusStockIn(\""+r.id+"\")'>Hapus</button>":"<span style='color:#a0aec0;font-size:10px'>-</span>")+"</td>"+
     "</tr>";
@@ -2347,8 +2344,8 @@ function exportStockIn(){
     let matchW=wh==="All"||(r.warehouse||"Bintaro").toUpperCase()===wh.toUpperCase();
     return matchK&&matchF&&matchT&&matchW;
   }).sort((a,b)=>b.tanggal.localeCompare(a.tanggal));
-  let rows=[["Tanggal","SKU","Nama Barang","Kategori","Gudang","Qty Masuk","Harga Satuan","Total Nilai","Referensi","Keterangan"]];
-  hasil.forEach(r=>rows.push([r.tanggal,r.sku,r.nama,r.kategori,r.warehouse,r.qty,r.harga,r.qty*r.harga,r.ref,r.keterangan||"-"]));
+  let rows=[["Tanggal","SKU","Nama Barang","Kategori","Gudang","Qty Masuk","Harga Satuan","Total Nilai","Keterangan"]];
+  hasil.forEach(r=>rows.push([r.tanggal,r.sku,r.nama,r.kategori,r.warehouse,r.qty,r.harga,r.qty*r.harga,r.keterangan||"-"]));
   let wb=XLSX.utils.book_new(); let ws=XLSX.utils.aoa_to_sheet(rows);
   XLSX.utils.book_append_sheet(wb,ws,"Stock In"); XLSX.writeFile(wb,"Stock_In_Export.xlsx");
 }
@@ -3683,14 +3680,14 @@ window.tampilkanStockIn = function(){
            (!from||r.tanggal>=from) && (!to||r.tanggal<=to) &&
            (wh==="All"||(r.warehouse||"Bintaro").toUpperCase()===wh.toUpperCase());
   }).sort((a,b)=>b.tanggal.localeCompare(a.tanggal));
-  if(hasil.length===0){ tbody.innerHTML="<tr><td colspan='12' class='kosong'>"+t("no_data_in")+"</td></tr>"; attachPagination(tbody,"pg-in",0,1,PAGE_SIZE,()=>{}); return; }
+  if(hasil.length===0){ tbody.innerHTML="<tr><td colspan='11' class='kosong'>"+t("no_data_in")+"</td></tr>"; attachPagination(tbody,"pg-in",0,1,PAGE_SIZE,()=>{}); return; }
   let page = _pageState.in;
   let sliced = hasil.slice((page-1)*PAGE_SIZE, page*PAGE_SIZE);
   let rows = sliced.map(function(r,ii){
     let i = (page-1)*PAGE_SIZE+ii;
     let uom = hitungUOM(r.qty,r.isiKarton);
     let nilai = r.qty*r.harga;
-    return "<tr><td>"+(i+1)+"</td><td>"+r.tanggal+"</td><td title='"+r.sku+"'>"+r.sku+"</td><td title='"+r.nama+"'>"+r.nama+"</td><td><span class='badge badge-gudang'>"+r.warehouse+"</span></td><td><span class='badge badge-in'>+"+r.qty+" pcs</span></td><td><strong>"+uom+"</strong></td><td>"+rpFormat(r.harga)+"</td><td><strong>"+rpFormat(nilai)+"</strong></td><td title='"+r.ref+"'>"+r.ref+"</td><td title='"+(r.keterangan||"-")+"'>"+(r.keterangan||"-")+"</td><td style='text-align:center'>"+(isAdmin()?"<button class='btn-action btn-edit' onclick='editStockIn(\""+r.id+"\")'>Edit</button> <button class='btn-action btn-hapus' onclick='hapusStockIn(\""+r.id+"\")'>Hapus</button>":"<span style='color:#a0aec0;font-size:10px'>-</span>")+"</td></tr>";
+    return "<tr><td>"+(i+1)+"</td><td>"+r.tanggal+"</td><td title='"+r.sku+"'>"+r.sku+"</td><td title='"+r.nama+"'>"+r.nama+"</td><td><span class='badge badge-gudang'>"+r.warehouse+"</span></td><td><span class='badge badge-in'>+"+r.qty+" pcs</span></td><td><strong>"+uom+"</strong></td><td>"+rpFormat(r.harga)+"</td><td><strong>"+rpFormat(nilai)+"</strong></td><td title='"+(r.keterangan||"-")+"'>"+(r.keterangan||"-")+"</td><td style='text-align:center'>"+(isAdmin()?"<button class='btn-action btn-edit' onclick='editStockIn(\""+r.id+"\")'>Edit</button> <button class='btn-action btn-hapus' onclick='hapusStockIn(\""+r.id+"\")'>Hapus</button>":"<span style='color:#a0aec0;font-size:10px'>-</span>")+"</td></tr>";
   });
   tbody.innerHTML = "";
   tbody.appendChild(buildRows(rows));
